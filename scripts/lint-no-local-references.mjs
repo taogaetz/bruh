@@ -95,7 +95,8 @@ function getFilesFromFilesystem() {
 function getFilesFromGit() {
   const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
     cwd: repoRoot,
-    encoding: 'utf8'
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
   });
 
   return output

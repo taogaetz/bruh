@@ -27,7 +27,7 @@
         "prebuild-nolog": "npm run lint",
         "build-nolog": "vite build --config vite/config.prod.mjs",
         "preview": "vite preview --outDir build",
-        "lint": "svelte-check --tsconfig ./tsconfig.json && node ./scripts/lint-no-local-references.mjs"
+        "lint": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && node ./scripts/lint-no-local-references.mjs"
     },
     "devDependencies": {
         "@tsconfig/svelte": "^5.0.4",

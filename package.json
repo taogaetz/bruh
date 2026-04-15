@@ -21,10 +21,13 @@
     ],
     "scripts": {
         "dev": "node log.js dev & vite --config vite/config.dev.mjs",
+        "prebuild": "npm run lint",
         "build": "node log.js build & vite build --config vite/config.prod.mjs",
         "dev-nolog": "vite --config vite/config.dev.mjs",
+        "prebuild-nolog": "npm run lint",
         "build-nolog": "vite build --config vite/config.prod.mjs",
-        "preview": "vite preview --outDir build"
+        "preview": "vite preview --outDir build",
+        "lint": "svelte-check --tsconfig ./tsconfig.json && node ./scripts/lint-no-local-references.mjs"
     },
     "devDependencies": {
         "@tsconfig/svelte": "^5.0.4",

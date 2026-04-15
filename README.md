@@ -29,9 +29,9 @@ This template has been updated for:
 
 ## Writing Code
 
-After cloning the repo, run `npm install` from your project directory. Then, you can start the local development server by running `npm run dev`.
+After cloning the repo, run `npm install` from your project directory. Then, start the development server with `npm run dev`.
 
-The local development server runs on `http://localhost:8080` by default. Please see the Vite documentation if you wish to change this, or add SSL support.
+The default host and port come from the Vite config for the current environment. If you need something else, change the Vite config explicitly instead of hardcoding a machine-specific address.
 
 Once the server is running you can edit any of the files in the `src` folder. Vite will automatically recompile your code and then reload the browser.
 

@@ -59,21 +59,69 @@ function isScannable(filePath) {
   return ALLOWED_BASENAMES.has(base);
 }
 
-function getFiles() {
-  try {
-    const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
-      cwd: repoRoot,
-      encoding: 'utf8'
-    });
+function walkDirectory(relativeDir = '.') {
+  const absoluteDir = path.join(repoRoot, relativeDir);
+  const entries = fs.readdirSync(absoluteDir, { withFileTypes: true });
+  const files = [];
 
-    return output
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .filter(isScannable);
+  for (const entry of entries) {
+    const relativePath = path.posix.join(relativeDir, entry.name);
+    const normalizedPath = relativePath.replace(/^\.\//, '');
+
+    if (entry.isDirectory()) {
+      if (IGNORED_PATH_SEGMENTS.has(entry.name)) continue;
+      files.push(...walkDirectory(normalizedPath));
+      continue;
+    }
+
+    if (entry.isFile() && isScannable(normalizedPath)) {
+      files.push(normalizedPath);
+    }
+  }
+
+  return files;
+}
+
+function getFilesFromFilesystem() {
+  try {
+    return walkDirectory();
   } catch (error) {
     console.error('Failed to enumerate repo files for local-reference lint.');
     console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+}
+
+function getFilesFromGit() {
+  const output = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
+    cwd: repoRoot,
+    encoding: 'utf8'
+  });
+
+  return output
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(isScannable);
+}
+
+function getFiles() {
+  try {
+    return getFilesFromGit();
+  } catch (error) {
+    const gitError = error;
+    const message = gitError instanceof Error ? gitError.message : String(gitError);
+    const code = typeof gitError === 'object' && gitError !== null && 'code' in gitError ? gitError.code : undefined;
+    const status = typeof gitError === 'object' && gitError !== null && 'status' in gitError ? gitError.status : undefined;
+    const isGitUnavailable = code === 'ENOENT' || message.includes('spawnSync git ENOENT');
+    const isNotGitRepo = status === 128 || message.includes('not a git repository');
+
+    if (isGitUnavailable || isNotGitRepo) {
+      return getFilesFromFilesystem();
+    }
+
+    console.error('Failed to enumerate repo files for local-reference lint.');
+    console.error(message);
     process.exit(1);
   }
 }

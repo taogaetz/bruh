@@ -129,7 +129,7 @@ export class RoomTemplateGenerator implements RoomTemplateGenerator {
             height: ROOM_HEIGHT,
             hasExitLeft: true,
             hasExitRight: true,
-            hasExitTop: true,
+            hasExitTop: hasTopExit,
             hasExitBottom: false
         };
     }
@@ -269,21 +269,10 @@ export class RoomTemplateGenerator implements RoomTemplateGenerator {
     private generateSideRoom(context?: RoomGenerationContext): Room {
         const tiles = this.createEmptyRoom();
         this.fillWalls(tiles, context);
-        // Side rooms have random exits, but ALWAYS at least one exit to prevent sealed rooms
-        let hasLeft = Math.random() > 0.4;
-        let hasRight = Math.random() > 0.4;
-        let hasTop = Math.random() > 0.4;
-        let hasBottom = Math.random() > 0.4;
-
-        // Ensure at least one exit - if none, force one
-        if (!hasLeft && !hasRight && !hasTop && !hasBottom) {
-            // Force at least one exit - prefer left or right
-            if (Math.random() > 0.5) {
-                hasLeft = true;
-            } else {
-                hasRight = true;
-            }
-        }
+        const hasLeft = Math.random() > 0.75;
+        const hasRight = Math.random() > 0.75;
+        const hasTop = Math.random() > 0.85;
+        const hasBottom = Math.random() > 0.85;
 
         this.createExits(tiles, hasLeft, hasRight, hasTop, hasBottom);
         this.addPlatforms(tiles, 0.5); // More variety in side rooms
@@ -630,4 +619,3 @@ export class RoomTemplateGenerator implements RoomTemplateGenerator {
         }
     }
 }
-

@@ -178,6 +178,26 @@ export class RoomLevelGenerator {
         }
     }
 
+    private getSolutionRoute(): SolutionTraceStep[] {
+        const route: SolutionTraceStep[] = [];
+
+        for (const step of this.solutionTrace) {
+            const existingIndex = route.findIndex((routeStep) => routeStep.x === step.x && routeStep.y === step.y);
+
+            if (existingIndex >= 0) {
+                route.splice(existingIndex + 1);
+                route[existingIndex] = { ...step };
+            } else {
+                route.push({ ...step });
+            }
+        }
+
+        return route.map((step) => ({
+            ...step,
+            roomType: this.grid[step.y][step.x]?.type ?? step.roomType
+        }));
+    }
+
     private validatePath(): void {
         // Verify that we have a start room and exit room
         let startPos: GridPosition | null = null;
@@ -370,7 +390,8 @@ export class RoomLevelGenerator {
             solutionTrace: this.solutionTrace.map((step) => ({
                 ...step,
                 roomType: this.grid[step.y][step.x]?.type ?? step.roomType
-            }))
+            })),
+            solutionRoute: this.getSolutionRoute()
         };
     }
 

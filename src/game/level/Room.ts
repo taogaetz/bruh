@@ -36,4 +36,5 @@ export interface RoomLevelDebugSnapshot {
     start: GridPosition;
     exit: GridPosition;
     solutionTrace: SolutionTraceStep[];
+    solutionRoute: SolutionTraceStep[];
 }

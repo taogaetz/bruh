@@ -85,6 +85,23 @@ try {
         assert(snapshot.solutionTrace[0].x === snapshot.start.x && snapshot.solutionTrace[0].y === snapshot.start.y, 'trace must start at start position');
         assert(lastStep?.x === snapshot.exit.x && lastStep?.y === snapshot.exit.y, 'trace must end at exit position');
         assert(lastStep?.roomType === RoomType.EXIT, 'last trace step must be exit');
+        assert(snapshot.solutionRoute.length > 0, 'solution route must be present');
+        assert(snapshot.solutionRoute[0].x === snapshot.start.x && snapshot.solutionRoute[0].y === snapshot.start.y, 'route must start at start position');
+        assert(snapshot.solutionRoute.at(-1)?.x === snapshot.exit.x && snapshot.solutionRoute.at(-1)?.y === snapshot.exit.y, 'route must end at exit position');
+
+        const routePositions = new Set();
+        for (let stepIndex = 0; stepIndex < snapshot.solutionRoute.length; stepIndex++) {
+            const step = snapshot.solutionRoute[stepIndex];
+            const key = `${step.x},${step.y}`;
+            assert(!routePositions.has(key), 'solution route must not revisit rooms');
+            routePositions.add(key);
+
+            if (stepIndex > 0) {
+                const previous = snapshot.solutionRoute[stepIndex - 1];
+                const distance = Math.abs(step.x - previous.x) + Math.abs(step.y - previous.y);
+                assert(distance === 1, 'solution route steps must be adjacent');
+            }
+        }
 
         const downwardEdges = new Set();
         for (let stepIndex = 1; stepIndex < snapshot.solutionTrace.length; stepIndex++) {

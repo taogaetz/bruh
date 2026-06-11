@@ -1,19 +1,30 @@
-import type { Room, GridPosition } from './Room';
+import type { Room, GridPosition, RoomLevelDebugSnapshot, SolutionTraceStep } from './Room';
 import { Direction } from './Room';
 import { RoomType, GRID_WIDTH, GRID_HEIGHT } from './RoomType';
 import { RoomTemplateGenerator } from './roomTemplates/RoomTemplate';
 
 export class RoomLevelGenerator {
+    private static readonly MAX_GENERATION_STEPS = 100;
+
     private grid: (Room | null)[][];
     private solutionPath: GridPosition[] = [];
+    private solutionTrace: SolutionTraceStep[] = [];
     private templateGenerator: RoomTemplateGenerator;
-    private currentDirection: Direction = Direction.RIGHT; // Track direction for edge handling
+    private startPos: GridPosition = { x: 0, y: 0 };
+    private exitPos: GridPosition = { x: 0, y: GRID_HEIGHT - 1 };
+    private horizontalDirection: Direction.LEFT | Direction.RIGHT = Direction.RIGHT;
 
     constructor() {
-        this.grid = [];
         this.templateGenerator = new RoomTemplateGenerator();
+        this.grid = [];
+        this.reset();
+    }
 
-        // Initialize grid
+    private reset(): void {
+        this.grid = [];
+        this.solutionPath = [];
+        this.solutionTrace = [];
+
         for (let y = 0; y < GRID_HEIGHT; y++) {
             this.grid[y] = [];
             for (let x = 0; x < GRID_WIDTH; x++) {
@@ -23,125 +34,52 @@ export class RoomLevelGenerator {
     }
 
     generate(): void {
-        // Step 1: Place start room in top row
-        const startX = Math.floor(Math.random() * GRID_WIDTH);
-        const startPos: GridPosition = { x: startX, y: 0 };
-        this.solutionPath = [];
-        this.solutionPath.push({ ...startPos });
+        this.reset();
 
-        // Place initial start room (Type 1 behavior: L/R)
-        // We use RoomType.START but treat it as having L/R exits
-        this.grid[0][startX] = this.templateGenerator.generateRoom(RoomType.START, {
-            gridX: startX,
-            gridY: 0,
+        const startX = Math.floor(Math.random() * GRID_WIDTH);
+        this.startPos = { x: startX, y: 0 };
+        this.horizontalDirection = Math.random() > 0.5 ? Direction.RIGHT : Direction.LEFT;
+
+        let currentPos: GridPosition = { ...this.startPos };
+        this.grid[currentPos.y][currentPos.x] = this.templateGenerator.generateRoom(RoomType.START, {
+            gridX: currentPos.x,
+            gridY: currentPos.y,
             hasBottomExit: false
         });
-        this.grid[0][startX]!.type = RoomType.START;
+        this.grid[currentPos.y][currentPos.x]!.type = RoomType.START;
+        this.solutionPath.push({ ...currentPos });
+        this.solutionTrace.push({
+            ...currentPos,
+            roomType: RoomType.START,
+            directionFromPrevious: 'start'
+        });
 
-        let currentPos = { ...startPos };
         let exitPlaced = false;
+        let stepCount = 0;
 
-        // Loop until we place the exit
         while (!exitPlaced) {
-            // Roll for direction: 1-5
-            // 1-2: Left
-            // 3-4: Right
-            // 5: Down
-            const roll = Math.floor(Math.random() * 5) + 1;
-            let direction: Direction;
-
-            if (roll <= 2) {
-                direction = Direction.LEFT;
-            } else if (roll <= 4) {
-                direction = Direction.RIGHT;
-            } else {
-                direction = Direction.DOWN;
-            }
-
-            // Edge handling: If hitting edge, force DOWN
-            if (direction === Direction.LEFT && currentPos.x === 0) {
-                direction = Direction.DOWN;
-            } else if (direction === Direction.RIGHT && currentPos.x === GRID_WIDTH - 1) {
-                direction = Direction.DOWN;
-            }
+            const direction = stepCount >= RoomLevelGenerator.MAX_GENERATION_STEPS
+                ? Direction.DOWN
+                : this.chooseKazemiDirection(currentPos);
+            stepCount++;
 
             if (direction === Direction.DOWN) {
-                // DOWN LOGIC
-
-                // 1. Check if we are already on the bottom row
                 if (currentPos.y === GRID_HEIGHT - 1) {
-                    // "If we are on the bottom row... and we try to drop... place the exit room."
-                    // Override current room to EXIT
-                    // Check if the current room was a START room
-                    const isStart = (currentPos.x === startPos.x && currentPos.y === startPos.y);
-
-                    // We need to know if the room above connects down to us (hasTopEntry)
-                    // If we moved laterally to get here, hasTopEntry is false.
-                    // If we dropped into here, hasTopEntry is true.
-                    // We can check the room above.
-                    const roomAbove = currentPos.y > 0 ? this.grid[currentPos.y - 1][currentPos.x] : null;
-                    const hasTopEntry = roomAbove ? roomAbove.hasExitBottom : false;
-
-                    // Re-generate current room as EXIT
-                    // If it was START, we technically lose the START type, but it's the exit now.
-                    // However, START room usually isn't EXIT room. But if grid is 1x1...
-                    // Let's assume grid is 4x4.
-
                     this.grid[currentPos.y][currentPos.x] = this.templateGenerator.generateRoom(RoomType.EXIT, {
                         gridX: currentPos.x,
                         gridY: currentPos.y,
-                        hasTopEntry: hasTopEntry
+                        hasTopEntry: this.hasTopEntry(currentPos)
                     });
                     this.grid[currentPos.y][currentPos.x]!.type = RoomType.EXIT;
-
+                    this.exitPos = { ...currentPos };
+                    this.updateTraceRoomTypeAt(currentPos, RoomType.EXIT);
                     exitPlaced = true;
                 } else {
-                    // 2. We are not on bottom row, so we drop down.
-
-                    // First, override CURRENT room to Type 2 (LEFT_RIGHT_BOTTOM)
-                    // If it's START, just update it to have bottom exit
-                    const currentRoom = this.grid[currentPos.y][currentPos.x]!;
-
-                    if (currentRoom.type === RoomType.START) {
-                        // Re-generate START with bottom exit
-                        this.grid[currentPos.y][currentPos.x] = this.templateGenerator.generateRoom(RoomType.START, {
-                            gridX: currentPos.x,
-                            gridY: currentPos.y,
-                            hasBottomExit: true
-                        });
-                        this.grid[currentPos.y][currentPos.x]!.type = RoomType.START;
-                    } else {
-                        // Override to Type 2 (LEFT_RIGHT_BOTTOM)
-                        // We need to preserve hasTopEntry if it had one
-                        const roomAbove = currentPos.y > 0 ? this.grid[currentPos.y - 1][currentPos.x] : null;
-                        const hasTopEntry = roomAbove ? roomAbove.hasExitBottom : false;
-
-                        this.grid[currentPos.y][currentPos.x] = this.templateGenerator.generateRoom(RoomType.LEFT_RIGHT_BOTTOM, {
-                            gridX: currentPos.x,
-                            gridY: currentPos.y,
-                            hasTopEntry: hasTopEntry,
-                            hasBottomExit: true // Type 2 always has bottom exit
-                        });
-                        this.grid[currentPos.y][currentPos.x]!.type = RoomType.LEFT_RIGHT_BOTTOM;
-                    }
-
-                    // Now move down
-                    currentPos.y++;
+                    this.convertCurrentRoomForDrop(currentPos);
+                    currentPos = { x: currentPos.x, y: currentPos.y + 1 };
                     this.solutionPath.push({ ...currentPos });
 
-                    // Decide type for NEW room
-                    // "HAS to be another type 2 bottom drop, or a type 3 upside-down T shape"
-                    // If on bottom row, MUST be Type 3 (can't drop further from Type 2)
-                    let newRoomType: RoomType;
-
-                    if (currentPos.y === GRID_HEIGHT - 1) {
-                        newRoomType = RoomType.LEFT_RIGHT_TOP; // Type 3
-                    } else {
-                        newRoomType = Math.random() > 0.5 ? RoomType.LEFT_RIGHT_BOTTOM : RoomType.LEFT_RIGHT_TOP;
-                    }
-
-                    // Place the new room
-                    // It definitely has a top entry because we just dropped down
+                    const newRoomType = this.chooseRoomTypeAfterDrop(currentPos);
                     this.grid[currentPos.y][currentPos.x] = this.templateGenerator.generateRoom(newRoomType, {
                         gridX: currentPos.x,
                         gridY: currentPos.y,
@@ -149,18 +87,19 @@ export class RoomLevelGenerator {
                         hasBottomExit: newRoomType === RoomType.LEFT_RIGHT_BOTTOM
                     });
                     this.grid[currentPos.y][currentPos.x]!.type = newRoomType;
+                    this.solutionTrace.push({
+                        ...currentPos,
+                        roomType: newRoomType,
+                        directionFromPrevious: Direction.DOWN
+                    });
                 }
             } else {
-                // LATERAL LOGIC (Left/Right)
-                if (direction === Direction.LEFT) {
-                    currentPos.x--;
-                } else {
-                    currentPos.x++;
-                }
+                currentPos = {
+                    x: currentPos.x + (direction === Direction.LEFT ? -1 : 1),
+                    y: currentPos.y
+                };
                 this.solutionPath.push({ ...currentPos });
 
-                // Place Type 1 (LEFT_RIGHT) only if room doesn't exist
-                // If it exists, it's already a valid path room (Type 1, 2, or 3), all of which have L/R exits.
                 if (!this.grid[currentPos.y][currentPos.x]) {
                     this.grid[currentPos.y][currentPos.x] = this.templateGenerator.generateRoom(RoomType.LEFT_RIGHT, {
                         gridX: currentPos.x,
@@ -170,17 +109,81 @@ export class RoomLevelGenerator {
                     });
                     this.grid[currentPos.y][currentPos.x]!.type = RoomType.LEFT_RIGHT;
                 }
+
+                this.solutionTrace.push({
+                    ...currentPos,
+                    roomType: this.grid[currentPos.y][currentPos.x]!.type,
+                    directionFromPrevious: direction
+                });
             }
         }
 
-        // Step 3: Fill remaining spaces with type 0 (side rooms)
         this.fillSideRooms();
-
-        // Step 4: Check for snake pits
         this.createSnakePits();
-
-        // Step 5: Validate that path exists from start to exit
         this.validatePath();
+    }
+
+    private chooseKazemiDirection(currentPos: GridPosition): Direction {
+        const roll = Math.floor(Math.random() * 5) + 1;
+        let direction: Direction = Direction.DOWN;
+
+        if (roll <= 2) {
+            direction = this.horizontalDirection;
+        } else if (roll <= 4) {
+            direction = this.oppositeDirection(this.horizontalDirection);
+        }
+
+        if (direction === Direction.LEFT && currentPos.x === 0) {
+            this.horizontalDirection = Direction.RIGHT;
+            direction = Direction.DOWN;
+        } else if (direction === Direction.RIGHT && currentPos.x === GRID_WIDTH - 1) {
+            this.horizontalDirection = Direction.LEFT;
+            direction = Direction.DOWN;
+        } else if (direction === Direction.LEFT || direction === Direction.RIGHT) {
+            this.horizontalDirection = direction;
+        }
+
+        return direction;
+    }
+
+    private oppositeDirection(direction: Direction.LEFT | Direction.RIGHT): Direction.LEFT | Direction.RIGHT {
+        return direction === Direction.LEFT ? Direction.RIGHT : Direction.LEFT;
+    }
+
+    private convertCurrentRoomForDrop(pos: GridPosition): void {
+        const currentRoom = this.grid[pos.y][pos.x];
+        const type = currentRoom?.type === RoomType.START ? RoomType.START : RoomType.LEFT_RIGHT_BOTTOM;
+
+        this.grid[pos.y][pos.x] = this.templateGenerator.generateRoom(type, {
+            gridX: pos.x,
+            gridY: pos.y,
+            hasTopEntry: this.hasTopEntry(pos),
+            hasBottomExit: true
+        });
+        this.grid[pos.y][pos.x]!.type = type;
+        this.updateTraceRoomTypeAt(pos, type);
+    }
+
+    private chooseRoomTypeAfterDrop(pos: GridPosition): RoomType {
+        if (pos.y === GRID_HEIGHT - 1) {
+            return RoomType.LEFT_RIGHT_TOP;
+        }
+        return Math.random() > 0.5 ? RoomType.LEFT_RIGHT_BOTTOM : RoomType.LEFT_RIGHT_TOP;
+    }
+
+    private hasTopEntry(pos: GridPosition): boolean {
+        if (pos.y === 0) {
+            return false;
+        }
+        return this.grid[pos.y - 1][pos.x]?.hasExitBottom ?? false;
+    }
+
+    private updateTraceRoomTypeAt(pos: GridPosition, roomType: RoomType): void {
+        for (const step of this.solutionTrace) {
+            if (step.x === pos.x && step.y === pos.y) {
+                step.roomType = roomType;
+            }
+        }
     }
 
     private validatePath(): void {
@@ -218,7 +221,6 @@ export class RoomLevelGenerator {
         const queue: { x: number, y: number }[] = [];
 
         // Start at player spawn (approximate center of start room)
-        const startRoom = this.grid[startPos.y][startPos.x]!;
         const startTileX = (startPos.x * 20) + 10;
         const startTileY = (startPos.y * 15) + 5;
 
@@ -289,37 +291,6 @@ export class RoomLevelGenerator {
             // this.generate(); 
         } else {
             console.log('Level validation successful: Path confirmed.');
-        }
-    }
-
-    private chooseDirection(currentPos: GridPosition): Direction {
-        // If at bottom row, can't go down
-        if (currentPos.y === GRID_HEIGHT - 1) {
-            return Math.random() > 0.5 ? Direction.LEFT : Direction.RIGHT;
-        }
-
-        // If we're close to bottom, bias towards going down
-        if (currentPos.y >= GRID_HEIGHT - 3) {
-            // Higher chance of going down when close to bottom
-            const roll = Math.random();
-            if (roll < 0.4) {
-                return Direction.DOWN;
-            } else if (roll < 0.7) {
-                return Direction.LEFT;
-            } else {
-                return Direction.RIGHT;
-            }
-        }
-
-        // Random number 1-5
-        const roll = Math.floor(Math.random() * 5) + 1;
-
-        if (roll <= 2) {
-            return Direction.LEFT;
-        } else if (roll <= 4) {
-            return Direction.RIGHT;
-        } else {
-            return Direction.DOWN;
         }
     }
 
@@ -399,6 +370,18 @@ export class RoomLevelGenerator {
         return this.solutionPath;
     }
 
+    getDebugSnapshot(): RoomLevelDebugSnapshot {
+        return {
+            roomTypes: this.grid.map((row) => row.map((room) => room?.type ?? RoomType.SIDE_ROOM)),
+            start: { ...this.startPos },
+            exit: { ...this.exitPos },
+            solutionTrace: this.solutionTrace.map((step) => ({
+                ...step,
+                roomType: this.grid[step.y][step.x]?.type ?? step.roomType
+            }))
+        };
+    }
+
     getRoom(x: number, y: number): Room | null {
         if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT) {
             return null;
@@ -406,4 +389,3 @@ export class RoomLevelGenerator {
         return this.grid[y][x];
     }
 }
-

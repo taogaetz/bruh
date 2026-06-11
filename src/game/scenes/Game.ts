@@ -107,6 +107,7 @@ export class Game extends Scene {
 
         // Draw debug path
         this.drawDebugPath();
+        console.table(this.roomLevelGenerator.getDebugSnapshot().roomTypes);
 
         EventBus.emit('current-scene-ready', this);
     }
@@ -325,7 +326,8 @@ export class Game extends Scene {
         this.debugGraphics.clear();
         this.debugGraphics.lineStyle(5, 0x00ff00, 0.8); // Green line, 5px thick, 80% opacity
 
-        const solutionPath = this.roomLevelGenerator.getSolutionPath();
+        const snapshot = this.roomLevelGenerator.getDebugSnapshot();
+        const solutionPath = snapshot.solutionTrace;
         if (solutionPath.length === 0) return;
 
         const getRoomCenter = (pos: { x: number, y: number }) => {
@@ -358,7 +360,7 @@ export class Game extends Scene {
                     const center = getRoomCenter({ x, y });
 
                     // Draw node
-                    if (this.roomLevelGenerator.getSolutionPath().some(p => p.x === x && p.y === y)) {
+                    if (snapshot.solutionTrace.some(p => p.x === x && p.y === y)) {
                         this.debugGraphics.fillCircle(center.x, center.y, 10);
                     }
 

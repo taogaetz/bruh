@@ -26,3 +26,14 @@ export enum Direction {
     DOWN = 'down'
 }
 
+export interface SolutionTraceStep extends GridPosition {
+    roomType: RoomType;
+    directionFromPrevious: Direction | 'start';
+}
+
+export interface RoomLevelDebugSnapshot {
+    roomTypes: RoomType[][];
+    start: GridPosition;
+    exit: GridPosition;
+    solutionTrace: SolutionTraceStep[];
+}

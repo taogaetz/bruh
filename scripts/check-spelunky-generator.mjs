@@ -86,6 +86,23 @@ try {
         assert(lastStep?.x === snapshot.exit.x && lastStep?.y === snapshot.exit.y, 'trace must end at exit position');
         assert(lastStep?.roomType === RoomType.EXIT, 'last trace step must be exit');
 
+        const downwardEdges = new Set();
+        for (let stepIndex = 1; stepIndex < snapshot.solutionTrace.length; stepIndex++) {
+            const previous = snapshot.solutionTrace[stepIndex - 1];
+            const current = snapshot.solutionTrace[stepIndex];
+            if (current.x === previous.x && current.y === previous.y + 1) {
+                downwardEdges.add(`${previous.x},${previous.y}`);
+            }
+        }
+
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+            for (let x = 0; x < GRID_WIDTH; x++) {
+                if (snapshot.roomTypes[y][x] === RoomType.LEFT_RIGHT_BOTTOM) {
+                    assert(downwardEdges.has(`${x},${y}`), 'type 2 rooms must correspond to a downward solution edge');
+                }
+            }
+        }
+
         for (const row of snapshot.roomTypes) {
             for (const type of row) {
                 assert(type !== undefined && type !== null, 'all cells must be assigned');

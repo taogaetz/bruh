@@ -79,17 +79,16 @@ export class RoomLevelGenerator {
                     currentPos = { x: currentPos.x, y: currentPos.y + 1 };
                     this.solutionPath.push({ ...currentPos });
 
-                    const newRoomType = this.chooseRoomTypeAfterDrop(currentPos);
-                    this.grid[currentPos.y][currentPos.x] = this.templateGenerator.generateRoom(newRoomType, {
+                    this.grid[currentPos.y][currentPos.x] = this.templateGenerator.generateRoom(RoomType.LEFT_RIGHT_TOP, {
                         gridX: currentPos.x,
                         gridY: currentPos.y,
                         hasTopEntry: true,
-                        hasBottomExit: newRoomType === RoomType.LEFT_RIGHT_BOTTOM
+                        hasBottomExit: false
                     });
-                    this.grid[currentPos.y][currentPos.x]!.type = newRoomType;
+                    this.grid[currentPos.y][currentPos.x]!.type = RoomType.LEFT_RIGHT_TOP;
                     this.solutionTrace.push({
                         ...currentPos,
-                        roomType: newRoomType,
+                        roomType: RoomType.LEFT_RIGHT_TOP,
                         directionFromPrevious: Direction.DOWN
                     });
                 }
@@ -162,13 +161,6 @@ export class RoomLevelGenerator {
         });
         this.grid[pos.y][pos.x]!.type = type;
         this.updateTraceRoomTypeAt(pos, type);
-    }
-
-    private chooseRoomTypeAfterDrop(pos: GridPosition): RoomType {
-        if (pos.y === GRID_HEIGHT - 1) {
-            return RoomType.LEFT_RIGHT_TOP;
-        }
-        return Math.random() > 0.5 ? RoomType.LEFT_RIGHT_BOTTOM : RoomType.LEFT_RIGHT_TOP;
     }
 
     private hasTopEntry(pos: GridPosition): boolean {
